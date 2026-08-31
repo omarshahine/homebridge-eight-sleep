@@ -8,3 +8,6 @@ coverage
 .env
 .DS_Store
 .clawpatch/
+
+# Local design docs (contain infra details); never committed
+docs/private/
