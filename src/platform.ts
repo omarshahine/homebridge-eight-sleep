@@ -29,8 +29,11 @@ export class EightSleepPlatform implements DynamicPlatformPlugin {
   private away?: AwayAccessory;
   private pollTimer?: NodeJS.Timeout;
   private confirmTimer?: NodeJS.Timeout;
+  private retryTimer?: NodeJS.Timeout;
   private polling = false;
+  private stopped = false;
   private warnedBlocked = false;
+  private warnedUnmatched = new Set<Side>();
 
   constructor(
     public readonly log: Logger,
@@ -65,12 +68,21 @@ export class EightSleepPlatform implements DynamicPlatformPlugin {
   // ---- lifecycle ------------------------------------------------------------
 
   private async start(attempt: number): Promise<void> {
+    if (this.stopped) {
+      return;
+    }
     try {
       await this.discover();
     } catch (err) {
       const delay = DISCOVERY_BACKOFF_MS[Math.min(attempt, DISCOVERY_BACKOFF_MS.length - 1)];
       this.log.error(`Discovery failed (${this.describe(err)}); retrying in ${delay / 1000}s`);
-      setTimeout(() => void this.start(attempt + 1), delay);
+      this.retryTimer = setTimeout(() => {
+        this.retryTimer = undefined;
+        void this.start(attempt + 1);
+      }, delay);
+      return;
+    }
+    if (this.stopped) {
       return;
     }
     this.pollTimer = setInterval(() => void this.poll('interval'), this.pollMs);
@@ -78,11 +90,15 @@ export class EightSleepPlatform implements DynamicPlatformPlugin {
   }
 
   private stop(): void {
+    this.stopped = true;
     if (this.pollTimer) {
       clearInterval(this.pollTimer);
     }
     if (this.confirmTimer) {
       clearTimeout(this.confirmTimer);
+    }
+    if (this.retryTimer) {
+      clearTimeout(this.retryTimer);
     }
     for (const side of this.sides.values()) {
       side.dispose();
@@ -200,6 +216,9 @@ export class EightSleepPlatform implements DynamicPlatformPlugin {
   // ---- polling --------------------------------------------------------------
 
   private scheduleConfirmPoll(): void {
+    if (this.stopped) {
+      return;
+    }
     if (this.confirmTimer) {
       clearTimeout(this.confirmTimer);
     }
@@ -210,8 +229,11 @@ export class EightSleepPlatform implements DynamicPlatformPlugin {
   }
 
   private async poll(reason: 'interval' | 'confirm'): Promise<void> {
-    if (this.polling || !this.client || !this.deviceId) {
+    if (this.stopped || this.polling || !this.client || !this.deviceId) {
       return;
+    }
+    if (this.client.blockedUntil <= Date.now()) {
+      this.warnedBlocked = false;
     }
     if (this.client.blockedUntil > Date.now()) {
       if (!this.warnedBlocked) {
@@ -224,7 +246,6 @@ export class EightSleepPlatform implements DynamicPlatformPlugin {
     this.polling = true;
     try {
       const device = await this.client.device(this.deviceId);
-      this.warnedBlocked = false;
       const assignments = resolveSideAssignments(device);
       this.applyDevice(device, assignments);
       if (this.cfg.debug) {
@@ -261,6 +282,10 @@ export class EightSleepPlatform implements DynamicPlatformPlugin {
     for (const a of assignments) {
       const side = this.sides.get(a.side);
       if (!side) {
+        if (!this.warnedUnmatched.has(a.side)) {
+          this.log.warn(`Side "${a.side}" appeared after discovery; restart Homebridge to add its accessory`);
+          this.warnedUnmatched.add(a.side);
+        }
         continue;
       }
       side.setUserId(a.userId);
