@@ -45,18 +45,26 @@ export class AwayAccessory {
       })
       .onSet(async value => {
         const target = value === true;
+        const previous = this.away;
         this.applyAway(target);
         try {
           await deps.client.setAway(this.userId, target);
         } catch (err) {
+          this.applyAway(previous);
           deps.log.error(`[${deps.displayName}] failed to set away=${target}: ${String(err)}`);
+          throw new api.hap.HapStatusError(api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
+        } finally {
+          deps.onWritten();
         }
-        deps.onWritten();
       });
   }
 
   setUserId(userId: string): void {
     this.userId = userId;
+  }
+
+  get isAway(): boolean {
+    return this.away;
   }
 
   applyAway(away: boolean): void {

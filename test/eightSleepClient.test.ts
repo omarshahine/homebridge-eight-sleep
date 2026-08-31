@@ -232,6 +232,20 @@ describe('commands', () => {
     expect(JSON.parse(String(f.calls[2].init.body))).toEqual({ awayPeriod: { end: '2026-01-01T12:00:00.000Z' } });
   });
 
+  it('getAway reads the authoritative per-user away state', async () => {
+    const { c, f } = await authed([json({ isAway: false }), json({ isAway: true })]);
+    await expect(c.getAway('L')).resolves.toBe(false);
+    await expect(c.getAway('R')).resolves.toBe(true);
+    expect(f.calls[1].url).toBe(`${APP_API}/users/L/away-mode`);
+    expect(f.calls[1].init.method).toBe('GET');
+    expect(f.calls[2].url).toBe(`${APP_API}/users/R/away-mode`);
+  });
+
+  it('getAway rejects a response without a boolean isAway state', async () => {
+    const { c } = await authed([json({})]);
+    await expect(c.getAway('L')).rejects.toThrow(/no isAway state/);
+  });
+
   it('redacts the user id from an ApiError message built from a /users/ URL', async () => {
     const { c } = await authed([new Response('boom', { status: 500 })]);
     const err = await c.setPower('SECRETID', true).catch(e => e);

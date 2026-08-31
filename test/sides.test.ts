@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isUserAway, resolveSideAssignments, sideState } from '../src/sides';
+import { resolveSideAssignments, sideState } from '../src/sides';
 import { DeviceResult } from '../src/types';
 
 describe('resolveSideAssignments', () => {
@@ -22,6 +22,19 @@ describe('resolveSideAssignments', () => {
   it('one side away, one home', () => {
     const d: DeviceResult = { leftUserId: 'L', rightUserId: '', awaySides: { rightUserId: 'R' } };
     expect(resolveSideAssignments(d)).toEqual([
+      { side: 'left', prefix: 'left', userId: 'L' },
+      { side: 'right', prefix: 'right', userId: 'R' },
+    ]);
+  });
+
+  it.each([
+    { leftUserId: 'R', rightUserId: 'R' },
+    { leftUserId: 'L', rightUserId: 'L' },
+  ])('prefers a distinct awaySides pair when top-level ids collapse to one user', topLevel => {
+    expect(resolveSideAssignments({
+      ...topLevel,
+      awaySides: { leftUserId: 'L', rightUserId: 'R' },
+    })).toEqual([
       { side: 'left', prefix: 'left', userId: 'L' },
       { side: 'right', prefix: 'right', userId: 'R' },
     ]);
@@ -61,16 +74,5 @@ describe('sideState', () => {
 
   it('missing numbers become 0', () => {
     expect(sideState({}, 'left')).toEqual({ on: false, targetLevel: 0, currentLevel: 0, nowHeating: false });
-  });
-});
-
-describe('isUserAway', () => {
-  it('true only when that user id is listed in awaySides', () => {
-    const d: DeviceResult = { awaySides: { leftUserId: 'L' } };
-    expect(isUserAway(d, 'L')).toBe(true);
-    expect(isUserAway(d, 'R')).toBe(false);
-    expect(isUserAway({}, 'L')).toBe(false);
-    expect(isUserAway({ awaySides: { leftUserId: 'L', rightUserId: 'R' } }, 'R')).toBe(true);
-    expect(isUserAway(d, '')).toBe(false);
   });
 });

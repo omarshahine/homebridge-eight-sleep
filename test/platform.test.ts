@@ -72,10 +72,20 @@ type FakeClient = {
   setPower: ReturnType<typeof vi.fn>;
   setLevel: ReturnType<typeof vi.fn>;
   setAway: ReturnType<typeof vi.fn>;
+  getAway: ReturnType<typeof vi.fn>;
 };
 
 function makeFakeClient(): FakeClient {
-  return { blockedUntil: 0, me: vi.fn(), device: vi.fn(), user: vi.fn(), setPower: vi.fn(), setLevel: vi.fn(), setAway: vi.fn() };
+  return {
+    blockedUntil: 0,
+    me: vi.fn(),
+    device: vi.fn(),
+    user: vi.fn(),
+    setPower: vi.fn(),
+    setLevel: vi.fn(),
+    setAway: vi.fn(),
+    getAway: vi.fn().mockResolvedValue(false),
+  };
 }
 
 function mockDiscoveryDefaults(fakeClient: FakeClient) {
@@ -179,5 +189,28 @@ describe('EightSleepPlatform', () => {
     expect(registeredUuids.some((u: string) => u.endsWith(':away'))).toBe(false);
     expect(registeredUuids).toContain('uuid:eight-sleep:D1:left');
     expect(registeredUuids).toContain('uuid:eight-sleep:D1:right');
+  });
+
+  it('reads each switch from the authoritative away endpoint, not awaySides', async () => {
+    const { api, hap, fakeClient } = setup();
+    fakeClient.me.mockResolvedValue({ userId: 'L', deviceId: 'D1' });
+    fakeClient.device.mockResolvedValue({
+      leftUserId: 'L',
+      rightUserId: 'R',
+      awaySides: { leftUserId: 'L', rightUserId: 'R' },
+      online: true,
+    });
+    fakeClient.user.mockImplementation(async (userId: string) => ({ userId, firstName: userId }));
+    fakeClient.getAway.mockImplementation(async (userId: string) => userId === 'R');
+
+    api.fire('didFinishLaunching');
+    await flush();
+
+    expect(fakeClient.getAway.mock.calls).toEqual([['L'], ['R']]);
+    const registered = api.registerPlatformAccessories.mock.calls.flatMap(c => c[2] as ReturnType<typeof makeAccessory>[]);
+    const leftAway = registered.find(a => a.UUID === 'uuid:eight-sleep:D1:left:away');
+    const rightAway = registered.find(a => a.UUID === 'uuid:eight-sleep:D1:right:away');
+    expect(leftAway?.getService(hap.Service.Switch)?.updateCharacteristic).toHaveBeenCalledWith('On', false);
+    expect(rightAway?.getService(hap.Service.Switch)?.updateCharacteristic).toHaveBeenCalledWith('On', true);
   });
 });

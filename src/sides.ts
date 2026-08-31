@@ -7,13 +7,19 @@ export interface SideAssignment {
 }
 
 /**
- * Port of eightctl's sideAssignmentsFromDevice. In Away mode the top-level
- * leftUserId/rightUserId are blank and the real IDs live in awaySides.
+ * Port of eightctl's sideAssignmentsFromDevice. The top-level IDs can be
+ * blank or duplicate the present user while someone is away; awaySides keeps
+ * the stable left/right assignment when it contains a distinct pair.
  */
 export function resolveSideAssignments(d: DeviceResult): SideAssignment[] {
   const away = d.awaySides ?? {};
-  const left = (d.leftUserId || away['leftUserId'] || '').trim();
-  const right = (d.rightUserId || away['rightUserId'] || '').trim();
+  const awayLeft = (away['leftUserId'] || '').trim();
+  const awayRight = (away['rightUserId'] || '').trim();
+  // With one person away, Eight Sleep can duplicate the present user's ID in
+  // both top-level fields. A distinct pair in awaySides is the stable mapping.
+  const hasAwayPair = Boolean(awayLeft && awayRight && awayLeft !== awayRight);
+  const left = (hasAwayPair ? awayLeft : d.leftUserId || awayLeft || '').trim();
+  const right = (hasAwayPair ? awayRight : d.rightUserId || awayRight || '').trim();
 
   if (left && right && left === right) {
     return [{ side: 'solo', prefix: 'left', userId: left }];
@@ -49,12 +55,4 @@ export function sideState(d: DeviceResult, prefix: SidePrefix): SideState {
     currentLevel,
     nowHeating: d[`${prefix}NowHeating`] === true,
   };
-}
-
-/** A user is "away" when their id appears among the awaySides values. */
-export function isUserAway(d: DeviceResult, userId: string): boolean {
-  if (!userId) {
-    return false;
-  }
-  return Object.values(d.awaySides ?? {}).includes(userId);
 }

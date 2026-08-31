@@ -6,7 +6,7 @@ import { EightSleepClient, RateLimitedError } from './eightSleepClient';
 import { PollHealth } from './health';
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
 import { SideAccessory } from './sideAccessory';
-import { SideAssignment, isUserAway, resolveSideAssignments, sideState } from './sides';
+import { SideAssignment, resolveSideAssignments, sideState } from './sides';
 import { TokenStore } from './tokenStore';
 import { DeviceResult, EightSleepConfig, Side } from './types';
 
@@ -34,6 +34,7 @@ export class EightSleepPlatform implements DynamicPlatformPlugin {
   private stopped = false;
   private warnedBlocked = false;
   private warnedUnmatched = new Set<Side>();
+  private warnedAway = new Set<Side>();
 
   constructor(
     public readonly log: Logger,
@@ -198,6 +199,7 @@ export class EightSleepPlatform implements DynamicPlatformPlugin {
     }
 
     this.applyDevice(device, assignments);
+    await this.refreshAwayStates(assignments);
   }
 
   private sideDisplayName(a: SideAssignment, firstName?: string): string {
@@ -278,6 +280,7 @@ export class EightSleepPlatform implements DynamicPlatformPlugin {
       const device = await this.client.device(this.deviceId);
       const assignments = resolveSideAssignments(device);
       this.applyDevice(device, assignments);
+      await this.refreshAwayStates(assignments);
       if (this.cfg.debug) {
         this.log.info(`[poll:${reason}] ${this.summarize(device, assignments)}`);
       }
@@ -320,12 +323,27 @@ export class EightSleepPlatform implements DynamicPlatformPlugin {
       }
       side.setUserId(a.userId);
       side.controller.applyState(sideState(device, a.prefix));
-      const away = this.aways.get(a.side);
-      if (away) {
-        away.setUserId(a.userId);
-        away.applyAway(isUserAway(device, a.userId));
-      }
     }
+  }
+
+  private async refreshAwayStates(assignments: SideAssignment[]): Promise<void> {
+    const client = this.client!;
+    await Promise.all(assignments.map(async a => {
+      const away = this.aways.get(a.side);
+      if (!away) {
+        return;
+      }
+      away.setUserId(a.userId);
+      try {
+        away.applyAway(await client.getAway(a.userId));
+        this.warnedAway.delete(a.side);
+      } catch (err) {
+        if (!this.warnedAway.has(a.side)) {
+          this.log.warn(`[${this.awayDisplayName(a)}] could not read away mode (${this.describe(err)}); keeping previous state`);
+          this.warnedAway.add(a.side);
+        }
+      }
+    }));
   }
 
   private summarize(device: DeviceResult, assignments: SideAssignment[]): string {
@@ -333,7 +351,7 @@ export class EightSleepPlatform implements DynamicPlatformPlugin {
       const s = sideState(device, a.prefix);
       return `${a.side}: ${s.on ? 'on' : 'off'} target=${s.targetLevel} current=${s.currentLevel}`;
     });
-    parts.push(`away=${assignments.map(a => `${a.side}:${isUserAway(device, a.userId)}`).join('/')}`);
+    parts.push(`away=${assignments.map(a => `${a.side}:${this.aways.get(a.side)?.isAway ?? 'hidden'}`).join('/')}`);
     parts.push(`online=${device.online !== false}`);
     return parts.join(', ');
   }

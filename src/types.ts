@@ -28,6 +28,10 @@ export interface UserResponse {
   };
 }
 
+export interface AwayModeResponse {
+  isAway?: boolean;
+}
+
 export interface KelvinState {
   active?: boolean;
   currentTargetLevel?: number;

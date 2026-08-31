@@ -1,6 +1,6 @@
 import { clampLevel } from './mapping';
 import { TokenStore, tokenIdentity } from './tokenStore';
-import { DeviceResponse, DeviceResult, MeResponse, TokenResponse, UserResponse } from './types';
+import { AwayModeResponse, DeviceResponse, DeviceResult, MeResponse, TokenResponse, UserResponse } from './types';
 
 // Verbatim from steipete/eightctl. These identify the Eight Sleep Android app, not a user.
 export const AUTH_URL = 'https://auth-api.8slp.net/v1/tokens';
@@ -132,6 +132,14 @@ export class EightSleepClient {
     const ts = new Date(this.now() - 24 * 60 * 60 * 1000).toISOString();
     const payload = away ? { awayPeriod: { start: ts } } : { awayPeriod: { end: ts } };
     await this.request('PUT', `${APP_API}/users/${encodeURIComponent(userId)}/away-mode`, payload);
+  }
+
+  async getAway(userId: string): Promise<boolean> {
+    const res = await this.request<AwayModeResponse>('GET', `${APP_API}/users/${encodeURIComponent(userId)}/away-mode`);
+    if (typeof res.isAway !== 'boolean') {
+      throw new Error('Eight Sleep away-mode response returned no isAway state');
+    }
+    return res.isAway;
   }
 
   // ---- internals ----------------------------------------------------------
