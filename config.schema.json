@@ -34,10 +34,10 @@
         "description": "How often to read the Pod's state. Minimum 30 seconds; Eight Sleep rate-limits aggressive polling."
       },
       "awaySwitch": {
-        "title": "Expose Away Mode Switch",
+        "title": "Expose Away Mode Switches",
         "type": "boolean",
         "default": true,
-        "description": "Adds an 'Eight Sleep Away' switch that toggles away mode for everyone on the Pod."
+        "description": "Adds one away-mode switch per bed side (e.g. 'Omar Away'). Eight Sleep tracks away mode per person."
       },
       "leftName": {
         "title": "Left Side Name",

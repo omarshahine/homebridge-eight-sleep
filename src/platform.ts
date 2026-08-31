@@ -6,7 +6,7 @@ import { EightSleepClient, RateLimitedError } from './eightSleepClient';
 import { PollHealth } from './health';
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
 import { SideAccessory } from './sideAccessory';
-import { SideAssignment, isHouseholdAway, resolveSideAssignments, sideState } from './sides';
+import { SideAssignment, isUserAway, resolveSideAssignments, sideState } from './sides';
 import { TokenStore } from './tokenStore';
 import { DeviceResult, EightSleepConfig, Side } from './types';
 
@@ -26,7 +26,7 @@ export class EightSleepPlatform implements DynamicPlatformPlugin {
   private model = 'Pod';
   private firmware = '0';
   private sides = new Map<Side, SideAccessory>();
-  private away?: AwayAccessory;
+  private aways = new Map<Side, AwayAccessory>();
   private pollTimer?: NodeJS.Timeout;
   private confirmTimer?: NodeJS.Timeout;
   private retryTimer?: NodeJS.Timeout;
@@ -161,21 +161,31 @@ export class EightSleepPlatform implements DynamicPlatformPlugin {
     }
 
     if (this.cfg.awaySwitch !== false) {
-      const uuid = this.api.hap.uuid.generate(`eight-sleep:${deviceId}:away`);
-      wanted.add(uuid);
-      const accessory = this.obtainAccessory(uuid, 'Eight Sleep Away');
-      this.away ??= new AwayAccessory({
-        api: this.api,
-        log: this.log,
-        accessory,
-        client,
-        model: this.model,
-        firmware: this.firmware,
-        serial: `${deviceId}-away`,
-        isHealthy: () => this.health.healthy,
-        onWritten: () => this.scheduleConfirmPoll(),
-      });
-      this.away.setUserIds(assignments.map(a => a.userId));
+      // Eight Sleep tracks away mode per person, so each side gets its own switch.
+      for (const a of assignments) {
+        const uuid = this.api.hap.uuid.generate(`eight-sleep:${deviceId}:${a.side}:away`);
+        wanted.add(uuid);
+        const displayName = this.awayDisplayName(a, names.get(a.userId));
+        const accessory = this.obtainAccessory(uuid, displayName);
+        const existing = this.aways.get(a.side);
+        if (existing) {
+          existing.setUserId(a.userId);
+          continue;
+        }
+        this.aways.set(a.side, new AwayAccessory({
+          api: this.api,
+          log: this.log,
+          accessory,
+          client,
+          userId: a.userId,
+          displayName,
+          model: this.model,
+          firmware: this.firmware,
+          serial: `${deviceId}-${a.side}-away`,
+          isHealthy: () => this.health.healthy,
+          onWritten: () => this.scheduleConfirmPoll(),
+        }));
+      }
     }
 
     const stale = this.cached.filter(a => !wanted.has(a.UUID));
@@ -199,6 +209,17 @@ export class EightSleepPlatform implements DynamicPlatformPlugin {
       return `${firstName}'s Side`;
     }
     return a.side === 'solo' ? 'Bed' : a.side === 'left' ? 'Left Side' : 'Right Side';
+  }
+
+  private awayDisplayName(a: SideAssignment, firstName?: string): string {
+    const override = a.side === 'left' ? this.cfg.leftName : a.side === 'right' ? this.cfg.rightName : undefined;
+    if (override && override.trim()) {
+      return `${override.trim()} Away`;
+    }
+    if (firstName) {
+      return `${firstName} Away`;
+    }
+    return a.side === 'solo' ? 'Bed Away' : a.side === 'left' ? 'Left Away' : 'Right Away';
   }
 
   private obtainAccessory(uuid: string, displayName: string): PlatformAccessory {
@@ -299,10 +320,11 @@ export class EightSleepPlatform implements DynamicPlatformPlugin {
       }
       side.setUserId(a.userId);
       side.controller.applyState(sideState(device, a.prefix));
-    }
-    if (this.away) {
-      this.away.setUserIds(assignments.map(a => a.userId));
-      this.away.applyAway(isHouseholdAway(device, assignments.map(a => a.userId)));
+      const away = this.aways.get(a.side);
+      if (away) {
+        away.setUserId(a.userId);
+        away.applyAway(isUserAway(device, a.userId));
+      }
     }
   }
 
@@ -311,7 +333,7 @@ export class EightSleepPlatform implements DynamicPlatformPlugin {
       const s = sideState(device, a.prefix);
       return `${a.side}: ${s.on ? 'on' : 'off'} target=${s.targetLevel} current=${s.currentLevel}`;
     });
-    parts.push(`away=${isHouseholdAway(device, assignments.map(a => a.userId))}`);
+    parts.push(`away=${assignments.map(a => `${a.side}:${isUserAway(device, a.userId)}`).join('/')}`);
     parts.push(`online=${device.online !== false}`);
     return parts.join(', ');
   }

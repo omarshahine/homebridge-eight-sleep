@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isHouseholdAway, resolveSideAssignments, sideState } from '../src/sides';
+import { isUserAway, resolveSideAssignments, sideState } from '../src/sides';
 import { DeviceResult } from '../src/types';
 
 describe('resolveSideAssignments', () => {
@@ -64,12 +64,13 @@ describe('sideState', () => {
   });
 });
 
-describe('isHouseholdAway', () => {
-  it('true only when every listed user is in awaySides', () => {
-    const d: DeviceResult = { awaySides: { leftUserId: 'L', rightUserId: 'R' } };
-    expect(isHouseholdAway(d, ['L', 'R'])).toBe(true);
-    expect(isHouseholdAway({ awaySides: { leftUserId: 'L' } }, ['L', 'R'])).toBe(false);
-    expect(isHouseholdAway({}, ['L'])).toBe(false);
-    expect(isHouseholdAway(d, [])).toBe(false);
+describe('isUserAway', () => {
+  it('true only when that user id is listed in awaySides', () => {
+    const d: DeviceResult = { awaySides: { leftUserId: 'L' } };
+    expect(isUserAway(d, 'L')).toBe(true);
+    expect(isUserAway(d, 'R')).toBe(false);
+    expect(isUserAway({}, 'L')).toBe(false);
+    expect(isUserAway({ awaySides: { leftUserId: 'L', rightUserId: 'R' } }, 'R')).toBe(true);
+    expect(isUserAway(d, '')).toBe(false);
   });
 });

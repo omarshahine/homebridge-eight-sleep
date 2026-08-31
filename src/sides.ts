@@ -51,11 +51,10 @@ export function sideState(d: DeviceResult, prefix: SidePrefix): SideState {
   };
 }
 
-/** Household is "away" only when every discovered user is in awaySides. */
-export function isHouseholdAway(d: DeviceResult, userIds: string[]): boolean {
-  if (userIds.length === 0) {
+/** A user is "away" when their id appears among the awaySides values. */
+export function isUserAway(d: DeviceResult, userId: string): boolean {
+  if (!userId) {
     return false;
   }
-  const awayIds = new Set(Object.values(d.awaySides ?? {}));
-  return userIds.every(id => awayIds.has(id));
+  return Object.values(d.awaySides ?? {}).includes(userId);
 }

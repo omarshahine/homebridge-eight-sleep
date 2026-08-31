@@ -156,10 +156,11 @@ describe('EightSleepPlatform', () => {
     );
     expect(registeredUuids).not.toContain('uuid:eight-sleep:D1:left');
     expect(registeredUuids).toContain('uuid:eight-sleep:D1:right');
-    expect(registeredUuids).toContain('uuid:eight-sleep:D1:away');
+    expect(registeredUuids).toContain('uuid:eight-sleep:D1:left:away');
+    expect(registeredUuids).toContain('uuid:eight-sleep:D1:right:away');
   });
 
-  it('unregisters the away accessory and registers no away switch when awaySwitch is false', async () => {
+  it('unregisters cached away accessories (including the legacy household one) and registers none when awaySwitch is false', async () => {
     const { api, hap, fakeClient, platform } = setup({ awaySwitch: false });
     mockDiscoveryDefaults(fakeClient);
 
@@ -175,7 +176,7 @@ describe('EightSleepPlatform', () => {
     const registeredUuids = api.registerPlatformAccessories.mock.calls.map(
       c => (c[2] as { UUID: string }[])[0].UUID,
     );
-    expect(registeredUuids).not.toContain('uuid:eight-sleep:D1:away');
+    expect(registeredUuids.some((u: string) => u.endsWith(':away'))).toBe(false);
     expect(registeredUuids).toContain('uuid:eight-sleep:D1:left');
     expect(registeredUuids).toContain('uuid:eight-sleep:D1:right');
   });

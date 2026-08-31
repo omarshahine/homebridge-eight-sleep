@@ -2,7 +2,7 @@
 
 [![npm](https://img.shields.io/npm/v/homebridge-eight-sleep)](https://www.npmjs.com/package/homebridge-eight-sleep)
 
-Eight Sleep Pod for [Homebridge](https://homebridge.io). Each bed side shows up in the Home app as a Heater/Cooler, plus an optional switch for away mode.
+Eight Sleep Pod for [Homebridge](https://homebridge.io). Each bed side shows up in the Home app as a Heater/Cooler, plus an optional away-mode switch per person.
 
 I wanted "Hey Siri, set the bed to cool" and a Leave Home automation that puts the Pod in away mode. Eight Sleep has no HomeKit support and no public API, so this plugin talks to the same cloud endpoints the Eight Sleep app uses. The API layer is a port of [steipete/eightctl](https://github.com/steipete/eightctl).
 
@@ -11,7 +11,7 @@ I wanted "Hey Siri, set the bed to cool" and a Leave Home automation that puts t
 | Accessory | HomeKit type | What it does |
 |---|---|---|
 | One per bed side ("Omar's Side", "Left Side", …) | Heater/Cooler | Power, Heat/Cool, and an intensity slider |
-| Eight Sleep Away | Switch | Away mode on/off for everyone on the Pod |
+| One per person ("Omar Away", "Lora Away", …) | Switch | That person's Eight Sleep away mode |
 
 Sides and names come from your account. A solo Pod gets one tile called "Bed".
 
@@ -54,7 +54,7 @@ Use the Homebridge UI, or add a platform block:
 |---|---|---|
 | `email`, `password` | required | Your Eight Sleep login. Both people on a shared Pod are controlled through the one account. |
 | `pollInterval` | `60` | Seconds between state reads. Minimum 30. |
-| `awaySwitch` | `true` | Expose the away-mode switch. |
+| `awaySwitch` | `true` | Expose the per-person away-mode switches. |
 | `leftName`, `rightName` | auto | Override the tile names. |
 | `debug` | `false` | Log every poll. |
 
@@ -64,7 +64,7 @@ Use the Homebridge UI, or add a platform block:
 - **No Response.** If the Pod is offline or the cloud hasn't answered for 5 minutes, the tiles show "No Response" rather than stale state.
 - **Latency.** Changes made in the Eight Sleep app show up in HomeKit within one poll interval. Changes from HomeKit are confirmed a few seconds later.
 - **Unofficial.** Eight Sleep can change or remove these endpoints at any time. This plugin is not affiliated with Eight Sleep.
-- **Away mode.** Setting a level or turning a side on from HomeKit works even while the household is in away mode, and does not clear away mode. Use the Away switch to leave away mode.
+- **Away mode.** Setting a level or turning a side on from HomeKit works even while the household is in away mode, and does not clear away mode. Use that person's Away switch to leave away mode.
 
 ## Credits
 

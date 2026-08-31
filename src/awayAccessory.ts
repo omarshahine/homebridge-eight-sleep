@@ -7,6 +7,8 @@ export interface AwayAccessoryDeps {
   log: Logger;
   accessory: PlatformAccessory;
   client: EightSleepClient;
+  userId: string;
+  displayName: string;
   model: string;
   firmware: string;
   serial: string;
@@ -14,15 +16,16 @@ export interface AwayAccessoryDeps {
   onWritten: () => void;
 }
 
-/** Household away mode as a HomeKit Switch. On = every discovered user is away. */
+/** One user's away mode as a HomeKit Switch (Eight Sleep tracks away per person, not per pod). */
 export class AwayAccessory {
   private readonly service: Service;
-  private userIds: string[] = [];
+  private userId: string;
   private away = false;
 
   constructor(private readonly deps: AwayAccessoryDeps) {
     const { api, accessory } = deps;
     const { Service: S, Characteristic: C } = api.hap;
+    this.userId = deps.userId;
 
     accessory.getService(S.AccessoryInformation)!
       .setCharacteristic(C.Manufacturer, 'Eight Sleep')
@@ -31,7 +34,7 @@ export class AwayAccessory {
       .setCharacteristic(C.FirmwareRevision, deps.firmware);
 
     this.service = accessory.getService(S.Switch) ?? accessory.addService(S.Switch);
-    this.service.setCharacteristic(C.Name, accessory.displayName);
+    this.service.setCharacteristic(C.Name, deps.displayName);
 
     this.service.getCharacteristic(C.On)
       .onGet(() => {
@@ -43,24 +46,22 @@ export class AwayAccessory {
       .onSet(async value => {
         const target = value === true;
         this.applyAway(target);
-        for (const userId of this.userIds) {
-          try {
-            await deps.client.setAway(userId, target);
-          } catch (err) {
-            deps.log.error(`[Away] failed to set away=${target}: ${String(err)}`);
-          }
+        try {
+          await deps.client.setAway(this.userId, target);
+        } catch (err) {
+          deps.log.error(`[${deps.displayName}] failed to set away=${target}: ${String(err)}`);
         }
         deps.onWritten();
       });
   }
 
-  setUserIds(userIds: string[]): void {
-    this.userIds = [...new Set(userIds)];
+  setUserId(userId: string): void {
+    this.userId = userId;
   }
 
   applyAway(away: boolean): void {
     if (this.away !== away) {
-      this.deps.log.info(`[Away] ${away ? 'on' : 'off'}`);
+      this.deps.log.info(`[${this.deps.displayName}] ${away ? 'on' : 'off'}`);
     }
     this.away = away;
     this.service.updateCharacteristic(this.deps.api.hap.Characteristic.On, away);
