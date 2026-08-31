@@ -167,6 +167,9 @@ export class SideController {
    * intensity/mode from this call are left in place for the retry).
    */
   private async flush(): Promise<void> {
+    if (this.disposed) {
+      return;
+    }
     if (this.writeInFlight) {
       this.schedule();
       return;
