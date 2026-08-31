@@ -139,4 +139,71 @@ describe('writes', () => {
     await vi.advanceTimersByTimeAsync(2000);
     expect(commands.setLevel).not.toHaveBeenCalled();
   });
+
+  it('setActive(false) cancels a pending level write', async () => {
+    const { ctl, commands } = make();
+    ctl.setIntensity(40);
+    await ctl.setActive(false);
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(commands.setLevel).not.toHaveBeenCalled();
+    expect(commands.setPower).toHaveBeenCalledWith('L', false);
+    expect(ctl.view().active).toBe(false);
+  });
+
+  it('ignores polled target state while a write is in flight, then accepts it', async () => {
+    let resolve!: () => void;
+    const { ctl, commands } = make();
+    commands.setLevel.mockImplementationOnce(() => new Promise<void>(r => {
+      resolve = r;
+    }));
+    ctl.setMode('cool');
+    ctl.setIntensity(50);
+    await vi.advanceTimersByTimeAsync(750);
+    expect(commands.setLevel).toHaveBeenCalledTimes(1);
+    ctl.applyState({ on: false, targetLevel: 0, currentLevel: 0, nowHeating: false });
+    expect(ctl.view()).toMatchObject({ active: true, intensity: 50, mode: 'cool' });
+    resolve();
+    await vi.advanceTimersByTimeAsync(0);
+    ctl.applyState({ on: true, targetLevel: -50, currentLevel: -20, nowHeating: false });
+    expect(ctl.view()).toMatchObject({ active: true, intensity: 50, currentTemperature: 25 });
+  });
+
+  it('still tracks currentLevel from polls while a write is pending', () => {
+    const { ctl } = make();
+    ctl.setIntensity(50);
+    ctl.applyState({ on: false, targetLevel: 0, currentLevel: -20, nowHeating: false });
+    expect(ctl.view().currentTemperature).toBe(25);
+    expect(ctl.view().intensity).toBe(50);
+  });
+
+  it('dispose during an in-flight write suppresses callbacks', async () => {
+    let resolve!: () => void;
+    const { ctl, commands, onWritten } = make();
+    commands.setLevel.mockImplementationOnce(() => new Promise<void>(r => {
+      resolve = r;
+    }));
+    ctl.setIntensity(30);
+    await vi.advanceTimersByTimeAsync(750);
+    ctl.dispose();
+    resolve();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(onWritten).not.toHaveBeenCalled();
+  });
+
+  it('serializes overlapping flushes', async () => {
+    let resolve!: () => void;
+    const { ctl, commands } = make();
+    commands.setLevel.mockImplementationOnce(() => new Promise<void>(r => {
+      resolve = r;
+    }));
+    ctl.setIntensity(30);
+    await vi.advanceTimersByTimeAsync(750);
+    ctl.setIntensity(60);
+    await vi.advanceTimersByTimeAsync(750);
+    expect(commands.setLevel).toHaveBeenCalledTimes(1);
+    resolve();
+    await vi.advanceTimersByTimeAsync(750);
+    expect(commands.setLevel).toHaveBeenCalledTimes(2);
+    expect(commands.setLevel).toHaveBeenLastCalledWith('L', -60);
+  });
 });

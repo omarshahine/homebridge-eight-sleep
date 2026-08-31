@@ -47,6 +47,8 @@ export class SideController {
   private pendingIntensity?: number;
   private pendingMode?: Mode;
   private timer?: ReturnType<typeof setTimeout>;
+  private writeInFlight = false;
+  private disposed = false;
   private readonly debounceMs: number;
   private readonly setTimeoutFn: typeof setTimeout;
   private readonly clearTimeoutFn: typeof clearTimeout;
@@ -77,14 +79,20 @@ export class SideController {
     };
   }
 
-  /** Apply a polled state. Skipped while a debounced write is pending so the slider doesn't snap back. */
+  /**
+   * Apply a polled state. currentLevel is always adopted (no HomeKit write ever
+   * updates it), but on/targetLevel/mode are skipped while a debounced write is
+   * pending or a write is in flight, so the slider doesn't snap back mid-gesture
+   * or get overwritten by pre-write server state.
+   */
   applyState(s: SideState): void {
-    if (this.timer) {
+    this.currentLevel = s.currentLevel;
+    if (this.timer || this.writeInFlight) {
+      this.opts.onChange(this.view());
       return;
     }
     this.on = s.on;
     this.targetLevel = s.targetLevel;
-    this.currentLevel = s.currentLevel;
     this.mode = modeOf(s.targetLevel, this.mode);
     if (s.targetLevel !== 0) {
       this.magnitude = intensityOf(s.targetLevel);
@@ -93,13 +101,18 @@ export class SideController {
   }
 
   async setActive(on: boolean): Promise<void> {
+    this.cancelPending();
     this.on = on;
     this.opts.onChange(this.view());
     try {
       await this.opts.commands.setPower(this.userId, on);
-      this.opts.onWritten?.();
+      if (!this.disposed) {
+        this.opts.onWritten?.();
+      }
     } catch (err) {
-      this.opts.onError?.(err);
+      if (!this.disposed) {
+        this.opts.onError?.(err);
+      }
     }
   }
 
@@ -125,6 +138,11 @@ export class SideController {
   }
 
   dispose(): void {
+    this.disposed = true;
+    this.cancelPending();
+  }
+
+  private cancelPending(): void {
     if (this.timer) {
       this.clearTimeoutFn(this.timer);
       this.timer = undefined;
@@ -143,7 +161,17 @@ export class SideController {
     }, this.debounceMs);
   }
 
+  /**
+   * Sends the coalesced write. If a previous flush's setLevel call is still in
+   * flight, re-schedules rather than overlapping two writes (the pending
+   * intensity/mode from this call are left in place for the retry).
+   */
   private async flush(): Promise<void> {
+    if (this.writeInFlight) {
+      this.schedule();
+      return;
+    }
+
     const mode = this.pendingMode ?? this.mode;
     const intensity = this.pendingIntensity ?? (intensityOf(this.targetLevel) || this.magnitude);
     this.pendingIntensity = undefined;
@@ -155,11 +183,18 @@ export class SideController {
     this.on = true; // setLevel implies "smart"
     this.opts.onChange(this.view());
 
+    this.writeInFlight = true;
     try {
       await this.opts.commands.setLevel(this.userId, level);
-      this.opts.onWritten?.();
+      if (!this.disposed) {
+        this.opts.onWritten?.();
+      }
     } catch (err) {
-      this.opts.onError?.(err);
+      if (!this.disposed) {
+        this.opts.onError?.(err);
+      }
+    } finally {
+      this.writeInFlight = false;
     }
   }
 }
