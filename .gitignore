@@ -1,0 +1,10 @@
+dist
+node_modules/
+coverage
+*.log
+*.tgz
+*.tsbuildinfo
+.eslintcache
+.env
+.DS_Store
+.clawpatch/

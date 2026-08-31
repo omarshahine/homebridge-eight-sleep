@@ -1,0 +1,15 @@
+src/
+test/
+scripts/
+docs/
+tsconfig.json
+vitest.config.ts
+eslint.config.mjs
+nodemon.json
+.github/
+.vscode/
+.claude/
+*.log
+node_modules/
+*.tgz
+.env
