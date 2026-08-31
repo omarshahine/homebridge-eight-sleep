@@ -103,6 +103,9 @@ export class EightSleepPlatform implements DynamicPlatformPlugin {
     for (const side of this.sides.values()) {
       side.dispose();
     }
+    if (this.cached.length > 0) {
+      this.api.updatePlatformAccessories(this.cached);
+    }
   }
 
   // ---- discovery ------------------------------------------------------------
@@ -229,7 +232,13 @@ export class EightSleepPlatform implements DynamicPlatformPlugin {
   }
 
   private async poll(reason: 'interval' | 'confirm'): Promise<void> {
-    if (this.stopped || this.polling || !this.client || !this.deviceId) {
+    if (this.stopped || !this.client || !this.deviceId) {
+      return;
+    }
+    if (this.polling) {
+      if (reason === 'confirm') {
+        this.scheduleConfirmPoll();
+      }
       return;
     }
     if (this.client.blockedUntil <= Date.now()) {
