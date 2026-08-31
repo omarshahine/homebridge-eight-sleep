@@ -129,7 +129,10 @@ export class EightSleepClient {
   }
 
   async setAway(userId: string, away: boolean): Promise<void> {
-    const ts = new Date(this.now() - 24 * 60 * 60 * 1000).toISOString();
+    // Match eightctl exactly: the app API expects whole-second timestamps with
+    // a fixed .000Z suffix. Date#toISOString otherwise preserves live millis.
+    const past = this.now() - 24 * 60 * 60 * 1000;
+    const ts = new Date(Math.floor(past / 1000) * 1000).toISOString();
     const payload = away ? { awayPeriod: { start: ts } } : { awayPeriod: { end: ts } };
     await this.request('PUT', `${APP_API}/users/${encodeURIComponent(userId)}/away-mode`, payload);
   }

@@ -13,6 +13,7 @@ import { DeviceResult, EightSleepConfig, Side } from './types';
 const MIN_POLL_S = 30;
 const DEFAULT_POLL_S = 60;
 const CONFIRM_POLL_MS = 3000;
+const AWAY_CONFIRM_POLL_MS = 10_000;
 const DISCOVERY_BACKOFF_MS = [30_000, 60_000, 120_000, 240_000, 480_000, 600_000];
 
 export class EightSleepPlatform implements DynamicPlatformPlugin {
@@ -29,6 +30,7 @@ export class EightSleepPlatform implements DynamicPlatformPlugin {
   private aways = new Map<Side, AwayAccessory>();
   private pollTimer?: NodeJS.Timeout;
   private confirmTimer?: NodeJS.Timeout;
+  private awayConfirmTimer?: NodeJS.Timeout;
   private retryTimer?: NodeJS.Timeout;
   private polling = false;
   private stopped = false;
@@ -97,6 +99,9 @@ export class EightSleepPlatform implements DynamicPlatformPlugin {
     }
     if (this.confirmTimer) {
       clearTimeout(this.confirmTimer);
+    }
+    if (this.awayConfirmTimer) {
+      clearTimeout(this.awayConfirmTimer);
     }
     if (this.retryTimer) {
       clearTimeout(this.retryTimer);
@@ -184,7 +189,7 @@ export class EightSleepPlatform implements DynamicPlatformPlugin {
           firmware: this.firmware,
           serial: `${deviceId}-${a.side}-away`,
           isHealthy: () => this.health.healthy,
-          onWritten: () => this.scheduleConfirmPoll(),
+          onWritten: () => this.scheduleAwayConfirmPoll(),
         }));
       }
     }
@@ -199,7 +204,7 @@ export class EightSleepPlatform implements DynamicPlatformPlugin {
     }
 
     this.applyDevice(device, assignments);
-    await this.refreshAwayStates(assignments);
+    await this.refreshAwayStates();
   }
 
   private sideDisplayName(a: SideAssignment, firstName?: string): string {
@@ -254,12 +259,24 @@ export class EightSleepPlatform implements DynamicPlatformPlugin {
     }, CONFIRM_POLL_MS);
   }
 
-  private async poll(reason: 'interval' | 'confirm'): Promise<void> {
+  private scheduleAwayConfirmPoll(): void {
+    if (this.stopped || this.awayConfirmTimer) {
+      return;
+    }
+    this.awayConfirmTimer = setTimeout(() => {
+      this.awayConfirmTimer = undefined;
+      void this.poll('away-confirm');
+    }, AWAY_CONFIRM_POLL_MS);
+  }
+
+  private async poll(reason: 'interval' | 'confirm' | 'away-confirm'): Promise<void> {
     if (this.stopped || !this.client || !this.deviceId) {
       return;
     }
     if (this.polling) {
-      if (reason === 'confirm') {
+      if (reason === 'away-confirm') {
+        this.scheduleAwayConfirmPoll();
+      } else if (reason === 'confirm') {
         this.scheduleConfirmPoll();
       }
       return;
@@ -273,6 +290,7 @@ export class EightSleepPlatform implements DynamicPlatformPlugin {
         this.log.warn(`Eight Sleep is rate limiting us; pausing polls for ${s}s`);
         this.warnedBlocked = true;
       }
+      this.syncAwayConfirmTimer();
       return;
     }
     this.polling = true;
@@ -280,7 +298,7 @@ export class EightSleepPlatform implements DynamicPlatformPlugin {
       const device = await this.client.device(this.deviceId);
       const assignments = resolveSideAssignments(device);
       this.applyDevice(device, assignments);
-      await this.refreshAwayStates(assignments);
+      await this.refreshAwayStates();
       if (this.cfg.debug) {
         this.log.info(`[poll:${reason}] ${this.summarize(device, assignments)}`);
       }
@@ -299,6 +317,7 @@ export class EightSleepPlatform implements DynamicPlatformPlugin {
       }
     } finally {
       this.polling = false;
+      this.syncAwayConfirmTimer();
     }
   }
 
@@ -326,24 +345,30 @@ export class EightSleepPlatform implements DynamicPlatformPlugin {
     }
   }
 
-  private async refreshAwayStates(assignments: SideAssignment[]): Promise<void> {
+  private async refreshAwayStates(): Promise<void> {
     const client = this.client!;
-    await Promise.all(assignments.map(async a => {
-      const away = this.aways.get(a.side);
-      if (!away) {
-        return;
-      }
-      away.setUserId(a.userId);
+    await Promise.all([...this.aways.entries()].map(async ([side, away]) => {
       try {
-        away.applyAway(await client.getAway(a.userId));
-        this.warnedAway.delete(a.side);
+        // Keep reading the per-person accessory even if entering Away makes
+        // the device payload temporarily omit every side assignment.
+        away.applyAway(await client.getAway(away.targetUserId));
+        this.warnedAway.delete(side);
       } catch (err) {
-        if (!this.warnedAway.has(a.side)) {
-          this.log.warn(`[${this.awayDisplayName(a)}] could not read away mode (${this.describe(err)}); keeping previous state`);
-          this.warnedAway.add(a.side);
+        if (!this.warnedAway.has(side)) {
+          this.log.warn(`[${away.displayName}] could not read away mode (${this.describe(err)}); keeping previous state`);
+          this.warnedAway.add(side);
         }
       }
     }));
+  }
+
+  private syncAwayConfirmTimer(): void {
+    if ([...this.aways.values()].some(away => away.confirmationPending)) {
+      this.scheduleAwayConfirmPoll();
+    } else if (this.awayConfirmTimer) {
+      clearTimeout(this.awayConfirmTimer);
+      this.awayConfirmTimer = undefined;
+    }
   }
 
   private summarize(device: DeviceResult, assignments: SideAssignment[]): string {

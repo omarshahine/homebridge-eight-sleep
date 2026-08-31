@@ -221,7 +221,8 @@ describe('commands', () => {
   });
 
   it('setAway writes a start (away) or end (home) 24h in the past', async () => {
-    const t0 = Date.UTC(2026, 0, 2, 12, 0, 0);
+    // eightctl always sends .000Z even when the wall clock has milliseconds.
+    const t0 = Date.UTC(2026, 0, 2, 12, 0, 0, 789);
     const f = fakeFetch([token(), json({}), json({})]);
     const c = new EightSleepClient({ email: 'a@b.c', password: 'pw', fetch: f.fn, store: mkStore(), now: () => t0 });
     await c.setAway('L', true);

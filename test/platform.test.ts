@@ -213,4 +213,19 @@ describe('EightSleepPlatform', () => {
     expect(leftAway?.getService(hap.Service.Switch)?.updateCharacteristic).toHaveBeenCalledWith('On', false);
     expect(rightAway?.getService(hap.Service.Switch)?.updateCharacteristic).toHaveBeenCalledWith('On', true);
   });
+
+  it('keeps reading known users when an away device payload omits all side assignments', async () => {
+    const { api, fakeClient } = setup({ pollInterval: 30 });
+    mockDiscoveryDefaults(fakeClient);
+
+    api.fire('didFinishLaunching');
+    await flush();
+    expect(fakeClient.getAway.mock.calls).toEqual([['L'], ['R']]);
+
+    fakeClient.device.mockResolvedValue({ online: true });
+    await vi.advanceTimersByTimeAsync(30_000);
+    await flush();
+
+    expect(fakeClient.getAway.mock.calls).toEqual([['L'], ['R'], ['L'], ['R']]);
+  });
 });
