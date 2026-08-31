@@ -89,8 +89,20 @@ describe('authentication', () => {
   it('auth failure surfaces as ApiError without the password in the message', async () => {
     const f = fakeFetch([new Response('nope', { status: 401 })]);
     const c = new EightSleepClient({ email: 'a@b.c', password: 'secretpw', fetch: f.fn, store: mkStore() });
-    await expect(c.me()).rejects.toBeInstanceOf(ApiError);
-    await expect(c.me().catch(e => String(e))).resolves.not.toContain('secretpw');
+    const err = await c.me().catch(e => e);
+    expect(err).toBeInstanceOf(ApiError);
+    expect(String(err)).not.toContain('secretpw');
+    expect((err as ApiError).message).not.toContain('secretpw');
+  });
+
+  it('deduplicates concurrent authentication into a single token request', async () => {
+    const f = fakeFetch([token(), json({ result: { online: true } }), json({ result: { online: true } })]);
+    const c = new EightSleepClient({ email: 'a@b.c', password: 'pw', fetch: f.fn, store: mkStore() });
+    const [a, b] = await Promise.all([c.device('D1'), c.device('D1')]);
+    expect(a).toEqual({ online: true });
+    expect(b).toEqual({ online: true });
+    expect(f.calls.filter(x => x.url === AUTH_URL)).toHaveLength(1);
+    expect(f.calls).toHaveLength(3);
   });
 });
 
@@ -199,5 +211,13 @@ describe('commands', () => {
     expect(err).toBeInstanceOf(ApiError);
     expect(err.status).toBe(500);
     expect(err.message).toContain('500');
+  });
+
+  it('non-JSON 2xx body surfaces as ApiError with context', async () => {
+    const { c } = await authed([new Response('<html>captive portal</html>', { status: 200 })]);
+    const err = await c.device('D1').catch(e => e);
+    expect(err).toBeInstanceOf(ApiError);
+    expect(err.message).toContain('/devices/D1');
+    expect(err.message).toContain('invalid JSON');
   });
 });

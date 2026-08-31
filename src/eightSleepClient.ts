@@ -67,6 +67,7 @@ export class EightSleepClient {
   private readonly identity: string;
   private token?: string;
   private tokenExpiresAt = 0;
+  private authInFlight?: Promise<void>;
 
   constructor(opts: ClientOptions) {
     this.email = opts.email;
@@ -176,7 +177,14 @@ export class EightSleepClient {
       // Never include the request body here: it contains the password.
       throw new ApiError(res.status, 'POST', AUTH_URL, res.status === 401 ? 'check email/password' : '');
     }
-    const body = (await res.json()) as TokenResponse;
+    const rawBody = await res.text();
+    let body: TokenResponse;
+    try {
+      body = JSON.parse(rawBody) as TokenResponse;
+    } catch {
+      // Never include the response text here: a captive-portal/proxy body could echo the request.
+      throw new ApiError(res.status, 'POST', AUTH_URL, 'invalid JSON in token response');
+    }
     if (!body.access_token) {
       throw new Error('Eight Sleep auth returned no access_token');
     }
@@ -196,7 +204,12 @@ export class EightSleepClient {
 
   private async ensureToken(): Promise<string> {
     if (!this.token || this.tokenExpiresAt <= this.now()) {
-      await this.authenticate();
+      if (!this.authInFlight) {
+        this.authInFlight = this.authenticate().finally(() => {
+          this.authInFlight = undefined;
+        });
+      }
+      await this.authInFlight;
     }
     return this.token!;
   }
@@ -242,7 +255,14 @@ export class EightSleepClient {
       const text = await res.text().catch(() => '');
       throw new ApiError(res.status, method, url, text.replace(/\s+/g, ' ').trim());
     }
-    const text = await res.text();
-    return (text ? JSON.parse(text) : {}) as T;
+    const text = await res.text().catch(() => '');
+    if (!text) {
+      return {} as T;
+    }
+    try {
+      return JSON.parse(text) as T;
+    } catch {
+      throw new ApiError(res.status, method, url, `invalid JSON: ${text.replace(/\s+/g, ' ').trim().slice(0, 80)}`);
+    }
   }
 }
