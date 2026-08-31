@@ -178,6 +178,14 @@ export class SideController {
     this.pendingMode = undefined;
 
     const level = composeLevel(mode, intensity);
+
+    if (level === 0 && !this.on) {
+      // A zero level on a powered-off side is a no-op; writing it would force "smart" and turn the side on.
+      this.targetLevel = 0;
+      this.opts.onChange(this.view());
+      return;
+    }
+
     this.mode = mode;
     this.targetLevel = level;
     this.on = true; // setLevel implies "smart"

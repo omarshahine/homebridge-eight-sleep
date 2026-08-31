@@ -206,4 +206,15 @@ describe('writes', () => {
     expect(commands.setLevel).toHaveBeenCalledTimes(2);
     expect(commands.setLevel).toHaveBeenLastCalledWith('L', -60);
   });
+
+  it('slider to 0 on an off side does not power it on', async () => {
+    const { ctl, commands, onWritten } = make();
+    await ctl.setActive(false);
+    ctl.setIntensity(0);
+    await vi.advanceTimersByTimeAsync(750);
+    expect(commands.setLevel).not.toHaveBeenCalled();
+    expect(commands.setPower).toHaveBeenCalledTimes(1);
+    expect(onWritten).toHaveBeenCalledTimes(1);
+    expect(ctl.view()).toMatchObject({ active: false, intensity: 0, currentState: 'inactive' });
+  });
 });
