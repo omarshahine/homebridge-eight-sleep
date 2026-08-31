@@ -24,7 +24,12 @@ export class TokenStore {
   load(identity: string): StoredToken | undefined {
     try {
       const raw = JSON.parse(readFileSync(this.file, 'utf8')) as Partial<StoredToken>;
-      if (raw.identity !== identity || typeof raw.token !== 'string' || typeof raw.expiresAt !== 'number') {
+      if (
+        raw.identity !== identity ||
+        typeof raw.token !== 'string' ||
+        typeof raw.expiresAt !== 'number' ||
+        (raw.userId !== undefined && typeof raw.userId !== 'string')
+      ) {
         return undefined;
       }
       return { identity: raw.identity, token: raw.token, expiresAt: raw.expiresAt, userId: raw.userId };

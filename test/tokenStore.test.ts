@@ -53,4 +53,12 @@ describe('TokenStore', () => {
     store.save({ identity: tokenIdentity('me@example.com', 'cid'), token: 't', expiresAt: 1 });
     expect(readFileSync(join(dir, 'token.json'), 'utf8')).not.toContain('me@example.com');
   });
+
+  it('rejects a file whose userId has the wrong type', () => {
+    const dir = freshDir();
+    const store = new TokenStore(dir);
+    store.save({ identity: 'id1', token: 't', expiresAt: 1 });
+    writeFileSync(join(dir, 'token.json'), JSON.stringify({ identity: 'id1', token: 't', expiresAt: 1, userId: 42 }));
+    expect(store.load('id1')).toBeUndefined();
+  });
 });
