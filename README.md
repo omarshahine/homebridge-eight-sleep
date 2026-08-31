@@ -63,6 +63,7 @@ Use the Homebridge UI, or add a platform block:
 - **No Response.** If the Pod is offline or the cloud hasn't answered for 5 minutes, the tiles show "No Response" rather than stale state.
 - **Latency.** Changes made in the Eight Sleep app show up in HomeKit within one poll interval. Changes from HomeKit are confirmed a few seconds later.
 - **Unofficial.** Eight Sleep can change or remove these endpoints at any time. This plugin is not affiliated with Eight Sleep.
+- **Away mode.** Setting a level or turning a side on from HomeKit works even while the household is in away mode, and does not clear away mode. Use the Away switch to leave away mode.
 
 ## Credits
 

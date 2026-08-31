@@ -5,6 +5,7 @@
   "headerDisplay": "Each bed side appears as a Heater/Cooler. Sides and names are discovered from your Eight Sleep account.",
   "schema": {
     "type": "object",
+    "required": ["email", "password"],
     "properties": {
       "name": {
         "title": "Name",
