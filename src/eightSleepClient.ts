@@ -22,7 +22,8 @@ export class ApiError extends Error {
     public readonly url: string,
     public readonly body: string,
   ) {
-    super(`Eight Sleep API ${method} ${url} failed: HTTP ${status}${body ? ` ${body.slice(0, 200)}` : ''}`);
+    const redactedUrl = url.replace(/\/users\/[^/]+/, '/users/…');
+    super(`Eight Sleep API ${method} ${redactedUrl} failed: HTTP ${status}${body ? ` ${body.slice(0, 200)}` : ''}`);
     this.name = 'ApiError';
   }
 }
@@ -190,7 +191,7 @@ export class EightSleepClient {
     }
     const expiresIn = body.expires_in && body.expires_in > 0 ? body.expires_in : DEFAULT_EXPIRES_IN_S;
     this.token = body.access_token;
-    this.tokenExpiresAt = this.now() + (expiresIn - EXPIRY_SKEW_S) * 1000;
+    this.tokenExpiresAt = this.now() + Math.max(expiresIn - EXPIRY_SKEW_S, 60) * 1000;
     if (body.userId) {
       this.userId = body.userId;
     }

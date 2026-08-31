@@ -78,12 +78,12 @@ describe('authentication', () => {
   it('persists the token with expiry = now + expires_in - 60s', async () => {
     const store = mkStore();
     const f = fakeFetch([
-      json({ access_token: 't', expires_in: 100, userId: 'U1' }),
+      json({ access_token: 't', expires_in: 200, userId: 'U1' }),
       json({ user: { userId: 'U1', currentDevice: { id: 'D1' } } }),
     ]);
     const c = new EightSleepClient({ email: 'a@b.c', password: 'pw', fetch: f.fn, store, now: () => 1_000_000 });
     await c.me();
-    expect(store.load(tokenIdentity('a@b.c', '0894c7f33bb94800a03f1f4df13a4f38'))?.expiresAt).toBe(1_000_000 + 40_000);
+    expect(store.load(tokenIdentity('a@b.c', '0894c7f33bb94800a03f1f4df13a4f38'))?.expiresAt).toBe(1_000_000 + 140_000);
   });
 
   it('auth failure surfaces as ApiError without the password in the message', async () => {
@@ -93,6 +93,20 @@ describe('authentication', () => {
     expect(err).toBeInstanceOf(ApiError);
     expect(String(err)).not.toContain('secretpw');
     expect((err as ApiError).message).not.toContain('secretpw');
+  });
+
+  it('never records an already-expired token when expires_in is tiny', async () => {
+    const store = mkStore();
+    const f = fakeFetch([
+      json({ access_token: 't', expires_in: 30, userId: 'U1' }),
+      json({ user: { userId: 'U1', currentDevice: { id: 'D1' } } }),
+      json({ result: {} }),
+    ]);
+    const c = new EightSleepClient({ email: 'a@b.c', password: 'pw', fetch: f.fn, store, now: () => 1_000_000 });
+    await c.me();
+    await c.device('D1');
+    expect(f.calls.filter(x => x.url === AUTH_URL)).toHaveLength(1);
+    expect(store.load(tokenIdentity('a@b.c', '0894c7f33bb94800a03f1f4df13a4f38'))?.expiresAt).toBe(1_000_000 + 60_000);
   });
 
   it('deduplicates concurrent authentication into a single token request', async () => {
@@ -203,6 +217,13 @@ describe('commands', () => {
     expect(f.calls[1].init.method).toBe('PUT');
     expect(JSON.parse(String(f.calls[1].init.body))).toEqual({ awayPeriod: { start: '2026-01-01T12:00:00.000Z' } });
     expect(JSON.parse(String(f.calls[2].init.body))).toEqual({ awayPeriod: { end: '2026-01-01T12:00:00.000Z' } });
+  });
+
+  it('redacts the user id from an ApiError message built from a /users/ URL', async () => {
+    const { c } = await authed([new Response('boom', { status: 500 })]);
+    const err = await c.setPower('SECRETID', true).catch(e => e);
+    expect(err).toBeInstanceOf(ApiError);
+    expect((err as ApiError).message).not.toContain('SECRETID');
   });
 
   it('non-2xx surfaces as ApiError with status and a body snippet', async () => {
