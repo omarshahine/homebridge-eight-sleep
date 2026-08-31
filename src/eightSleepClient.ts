@@ -15,6 +15,9 @@ const DEFAULT_TIMEOUT_MS = 20_000;
 const DEFAULT_EXPIRES_IN_S = 3600;
 const EXPIRY_SKEW_S = 60;
 
+/** Strips the user id segment from a URL before it lands in a log-visible error message. */
+const redactUrl = (url: string): string => url.replace(/\/users\/[^/]+/, '/users/…');
+
 export class ApiError extends Error {
   constructor(
     public readonly status: number,
@@ -22,8 +25,7 @@ export class ApiError extends Error {
     public readonly url: string,
     public readonly body: string,
   ) {
-    const redactedUrl = url.replace(/\/users\/[^/]+/, '/users/…');
-    super(`Eight Sleep API ${method} ${redactedUrl} failed: HTTP ${status}${body ? ` ${body.slice(0, 200)}` : ''}`);
+    super(`Eight Sleep API ${method} ${redactUrl(url)} failed: HTTP ${status}${body ? ` ${body.slice(0, 200)}` : ''}`);
     this.name = 'ApiError';
   }
 }
@@ -32,7 +34,7 @@ export class RateLimitedError extends ApiError {
   constructor(method: string, url: string, public readonly retryAfterMs: number) {
     super(429, method, url, '');
     this.name = 'RateLimitedError';
-    this.message = `Eight Sleep API rate limited (${method} ${url}); retry in ${Math.round(retryAfterMs / 1000)}s`;
+    this.message = `Eight Sleep API rate limited (${method} ${redactUrl(url)}); retry in ${Math.round(retryAfterMs / 1000)}s`;
   }
 }
 

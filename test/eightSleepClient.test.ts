@@ -144,6 +144,19 @@ describe('401 handling', () => {
 });
 
 describe('429 handling', () => {
+  it('RateLimitedError message does not leak the user id from the URL', async () => {
+    const f = fakeFetch([token(), new Response('', { status: 429, headers: { 'retry-after': '5' } })]);
+    const c = new EightSleepClient({ email: 'a@b.c', password: 'pw', fetch: f.fn, store: mkStore(), now: () => 0 });
+    const err = await c.setPower('SECRETUSER', true).catch(e => e);
+    expect(err).toBeInstanceOf(RateLimitedError);
+    expect(err.message).not.toContain('SECRETUSER');
+    expect(err.message).toContain('/users/…/temperature');
+    // A blocked call that never reaches the network is redacted too.
+    const err2 = await c.setPower('SECRETUSER', true).catch(e => e);
+    expect(err2).toBeInstanceOf(RateLimitedError);
+    expect(err2.message).not.toContain('SECRETUSER');
+  });
+
   it('honors Retry-After, sets blockedUntil, and short-circuits until then', async () => {
     let now = 1000;
     const f = fakeFetch([token(), new Response('', { status: 429, headers: { 'retry-after': '45' } })]);
