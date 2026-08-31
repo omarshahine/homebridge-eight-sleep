@@ -47,3 +47,15 @@ export function pseudoCelsius(level: number): number {
   const c = (f - 32) * 5 / 9;
   return Math.round(c * 10) / 10;
 }
+
+/**
+ * Inverse of pseudoCelsius: a HomeKit threshold temperature (C) back to a
+ * level on the same 55-110 F scale. Out-of-range input clamps to +/-100.
+ */
+export function levelFromCelsius(celsius: number): number {
+  if (!Number.isFinite(celsius)) {
+    return 0;
+  }
+  const f = celsius * 9 / 5 + 32;
+  return clampLevel(((f - MIN_F) / (MAX_F - MIN_F)) * 200 - 100);
+}

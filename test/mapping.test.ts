@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clampLevel, composeLevel, intensityOf, modeOf, pseudoCelsius } from '../src/mapping';
+import { clampLevel, composeLevel, intensityOf, levelFromCelsius, modeOf, pseudoCelsius } from '../src/mapping';
 
 describe('clampLevel', () => {
   it('clamps to -100..100 and rounds', () => {
@@ -49,5 +49,30 @@ describe('pseudoCelsius', () => {
   it('rounds to one decimal and clamps input', () => {
     expect(pseudoCelsius(-31)).toBe(23.3);
     expect(pseudoCelsius(999)).toBeCloseTo(43.3, 1);
+  });
+});
+
+describe('levelFromCelsius', () => {
+  it('inverts pseudoCelsius at the endpoints and midpoint', () => {
+    expect(levelFromCelsius(12.8)).toBe(-100);
+    expect(levelFromCelsius(28.1)).toBe(0);
+    expect(levelFromCelsius(43.3)).toBe(100);
+  });
+
+  it('maps Home-style targets to levels (77 F -> -20, 95 F -> +45)', () => {
+    expect(levelFromCelsius(25)).toBe(-20);
+    expect(levelFromCelsius(35)).toBe(45);
+  });
+
+  it('clamps out-of-range temperatures', () => {
+    expect(levelFromCelsius(0)).toBe(-100);
+    expect(levelFromCelsius(60)).toBe(100);
+    expect(levelFromCelsius(NaN)).toBe(0);
+  });
+
+  it('round-trips through pseudoCelsius within one level', () => {
+    for (const level of [-100, -73, -31, -20, 0, 7, 45, 100]) {
+      expect(Math.abs(levelFromCelsius(pseudoCelsius(level)) - level)).toBeLessThanOrEqual(1);
+    }
   });
 });

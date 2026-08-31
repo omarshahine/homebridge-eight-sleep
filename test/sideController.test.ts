@@ -23,7 +23,9 @@ describe('applyState -> view', () => {
   it('maps a polled cooling state', () => {
     const { ctl } = make();
     ctl.applyState({ on: true, targetLevel: -40, currentLevel: -31, nowHeating: false });
-    expect(ctl.view()).toEqual({ active: true, mode: 'cool', intensity: 40, currentState: 'cooling', currentTemperature: 23.3 });
+    expect(ctl.view()).toEqual({
+      active: true, mode: 'cool', intensity: 40, currentState: 'cooling', currentTemperature: 23.3, targetTemperature: 21.9,
+    });
   });
 
   it('off is inactive; on at level 0 is idle; positive is heating', () => {
@@ -216,5 +218,41 @@ describe('writes', () => {
     expect(commands.setPower).toHaveBeenCalledTimes(1);
     expect(onWritten).toHaveBeenCalledTimes(1);
     expect(ctl.view()).toMatchObject({ active: false, intensity: 0, currentState: 'inactive' });
+  });
+});
+
+describe('target temperature (HomeKit threshold dial)', () => {
+  it('view exposes the target as a pseudo temperature', () => {
+    const { ctl } = make();
+    ctl.applyState({ on: true, targetLevel: -40, currentLevel: -35, nowHeating: false });
+    expect(ctl.view().targetTemperature).toBe(21.9);
+  });
+
+  it('setTargetTemperature writes the mapped level after the debounce', async () => {
+    const { ctl, commands } = make();
+    ctl.setTargetTemperature(25);
+    expect(ctl.view()).toMatchObject({ mode: 'cool', intensity: 20, targetTemperature: 25 });
+    await vi.advanceTimersByTimeAsync(750);
+    expect(commands.setLevel).toHaveBeenCalledWith('L', -20);
+    expect(ctl.view().active).toBe(true);
+  });
+
+  it('a warm target flips a cooling side to heat', async () => {
+    const { ctl, commands } = make();
+    ctl.applyState({ on: true, targetLevel: -40, currentLevel: -40, nowHeating: false });
+    ctl.setTargetTemperature(35);
+    expect(ctl.view().mode).toBe('heat');
+    await vi.advanceTimersByTimeAsync(750);
+    expect(commands.setLevel).toHaveBeenCalledWith('L', 45);
+    expect(ctl.lastMagnitude).toBe(45);
+  });
+
+  it('dial and slider coalesce into one write', async () => {
+    const { ctl, commands } = make();
+    ctl.setTargetTemperature(25);
+    ctl.setIntensity(30);
+    await vi.advanceTimersByTimeAsync(750);
+    expect(commands.setLevel).toHaveBeenCalledTimes(1);
+    expect(commands.setLevel).toHaveBeenCalledWith('L', -30);
   });
 });

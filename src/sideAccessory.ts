@@ -4,6 +4,17 @@ import { EightSleepClient } from './eightSleepClient';
 import { SideController, SideView } from './sideController';
 import { Mode, Side } from './types';
 
+// Threshold dial range = pseudoCelsius(-100)..pseudoCelsius(+100), widened to whole half-degrees.
+const THRESHOLD_MIN_C = 12.5;
+const THRESHOLD_MAX_C = 43.5;
+const THRESHOLD_STEP_C = 0.5;
+
+/** HAP thresholds use a 0.5 C step; snap so updateCharacteristic never pushes an off-step value. */
+function halfDegree(celsius: number): number {
+  const snapped = Math.round(celsius * 2) / 2;
+  return Math.max(THRESHOLD_MIN_C, Math.min(THRESHOLD_MAX_C, snapped));
+}
+
 export interface SideAccessoryContext {
   side: Side;
   userId: string;
@@ -78,6 +89,15 @@ export class SideAccessory {
     this.service.getCharacteristic(C.CurrentTemperature)
       .setProps({ minValue: 0, maxValue: 50, minStep: 0.1 })
       .onGet(() => this.guard(() => this.controller.view().currentTemperature));
+
+    // Home renders the HeaterCooler tile as "<Mode> to <threshold>"; without these it shows "(null)".
+    // Both thresholds are the same target level on the pseudo-temperature scale.
+    for (const threshold of [C.CoolingThresholdTemperature, C.HeatingThresholdTemperature]) {
+      this.service.getCharacteristic(threshold)
+        .setProps({ minValue: THRESHOLD_MIN_C, maxValue: THRESHOLD_MAX_C, minStep: THRESHOLD_STEP_C })
+        .onGet(() => this.guard(() => halfDegree(this.controller.view().targetTemperature)))
+        .onSet(value => this.controller.setTargetTemperature(Number(value)));
+    }
   }
 
   setUserId(userId: string): void {
@@ -106,6 +126,9 @@ export class SideAccessory {
     this.service.updateCharacteristic(C.TargetHeaterCoolerState, this.targetStateValue(view.mode));
     this.service.updateCharacteristic(C.RotationSpeed, view.intensity);
     this.service.updateCharacteristic(C.CurrentTemperature, view.currentTemperature);
+    const target = halfDegree(view.targetTemperature);
+    this.service.updateCharacteristic(C.CoolingThresholdTemperature, target);
+    this.service.updateCharacteristic(C.HeatingThresholdTemperature, target);
   }
 
   private currentStateValue(view: SideView): number {

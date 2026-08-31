@@ -21,6 +21,7 @@ Eight Sleep uses a level from -100 (coldest) to +100 (warmest). In HomeKit:
 
 - **Heat / Cool** picks the sign.
 - The **intensity slider (0–100 %)** is the magnitude. "Cool at 40 %" is level -40.
+- The **temperature dial** on the tile is that same level shown on Eight Sleep's 55–110 °F scale, so "Cooling to 77°" is level -20. Drag the dial or the slider; they move together.
 - Turning the tile **off** turns the side off. Turning it **on** resumes Autopilot ("smart" mode).
 - Moving the slider on an off side turns it on, same as the Eight Sleep app.
 

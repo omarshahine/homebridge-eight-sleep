@@ -1,4 +1,4 @@
-import { composeLevel, intensityOf, modeOf, pseudoCelsius } from './mapping';
+import { composeLevel, intensityOf, levelFromCelsius, modeOf, pseudoCelsius } from './mapping';
 import { Mode, SideState } from './types';
 
 export type CurrentState = 'inactive' | 'idle' | 'heating' | 'cooling';
@@ -9,6 +9,8 @@ export interface SideView {
   intensity: number;
   currentState: CurrentState;
   currentTemperature: number;
+  /** The target level expressed on the same pseudo-temperature scale (HomeKit threshold dial). */
+  targetTemperature: number;
 }
 
 export interface SideCommands {
@@ -76,6 +78,7 @@ export class SideController {
       intensity: intensityOf(this.targetLevel),
       currentState,
       currentTemperature: pseudoCelsius(this.currentLevel),
+      targetTemperature: pseudoCelsius(this.targetLevel),
     };
   }
 
@@ -133,6 +136,26 @@ export class SideController {
       this.magnitude = v;
     }
     this.targetLevel = composeLevel(this.mode, v);
+    this.opts.onChange(this.view());
+    this.schedule();
+  }
+
+  /**
+   * HomeKit's threshold dial: a temperature on the pseudo scale becomes a level,
+   * which sets both mode (sign) and intensity (magnitude). Shares the debounce
+   * with the slider so a dial drag is one write.
+   */
+  setTargetTemperature(celsius: number): void {
+    const level = levelFromCelsius(celsius);
+    const mode = modeOf(level, this.mode);
+    const intensity = intensityOf(level);
+    this.pendingMode = mode;
+    this.pendingIntensity = intensity;
+    this.mode = mode;
+    if (intensity > 0) {
+      this.magnitude = intensity;
+    }
+    this.targetLevel = level;
     this.opts.onChange(this.view());
     this.schedule();
   }
