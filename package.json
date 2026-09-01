@@ -1,6 +1,6 @@
 {
   "displayName": "Eight Sleep",
-  "name": "homebridge-eight-sleep",
+  "name": "@omarshahine/homebridge-eight-sleep",
   "version": "1.0.0",
   "description": "Eight Sleep Pod for Homebridge: a Heater/Cooler per bed side plus an away-mode switch.",
   "license": "MIT",
@@ -37,6 +37,7 @@
   },
   "keywords": [
     "homebridge-plugin",
+    "supports-hap",
     "homebridge",
     "eight-sleep",
     "eightsleep",

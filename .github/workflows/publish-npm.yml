@@ -32,10 +32,10 @@ jobs:
         id: check
         run: |
           PKG_VERSION=$(node -p "require('./package.json').version")
-          if npm view "homebridge-eight-sleep@$PKG_VERSION" version >/dev/null 2>&1; then
+          if npm view "@omarshahine/homebridge-eight-sleep@$PKG_VERSION" version >/dev/null 2>&1; then
             echo "Version $PKG_VERSION already published; skipping"
             echo "already=true" >> "$GITHUB_OUTPUT"
           fi
       - if: steps.check.outputs.already != 'true'
         run: npm publish --provenance --access public
-      - run: npm view homebridge-eight-sleep version
+      - run: npm view @omarshahine/homebridge-eight-sleep version

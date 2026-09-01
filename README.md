@@ -1,6 +1,6 @@
 # homebridge-eight-sleep
 
-[![npm](https://img.shields.io/npm/v/homebridge-eight-sleep)](https://www.npmjs.com/package/homebridge-eight-sleep)
+[![npm](https://img.shields.io/npm/v/%40omarshahine%2Fhomebridge-eight-sleep)](https://www.npmjs.com/package/@omarshahine/homebridge-eight-sleep)
 
 Eight Sleep Pod for [Homebridge](https://homebridge.io). Each bed side shows up in the Home app as a Heater/Cooler, plus an optional away-mode switch per person.
 
@@ -29,10 +29,10 @@ The Heater/Cooler tile also has to show a "current temperature". Eight Sleep doe
 
 ## Install
 
-Search for `homebridge-eight-sleep` in the Homebridge UI, or:
+Search for `eight-sleep` in the Homebridge UI, or:
 
 ```sh
-npm install -g homebridge-eight-sleep
+npm install -g @omarshahine/homebridge-eight-sleep
 ```
 
 ## Configure

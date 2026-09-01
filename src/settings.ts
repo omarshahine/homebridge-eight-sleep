@@ -2,4 +2,4 @@
 export const PLATFORM_NAME = 'EightSleep';
 
 /** Must match "name" in package.json. */
-export const PLUGIN_NAME = 'homebridge-eight-sleep';
+export const PLUGIN_NAME = '@omarshahine/homebridge-eight-sleep';

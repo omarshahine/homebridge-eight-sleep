@@ -5,7 +5,10 @@
   "headerDisplay": "Each bed side appears as a Heater/Cooler. Sides and names are discovered from your Eight Sleep account.",
   "schema": {
     "type": "object",
-    "required": ["email", "password"],
+    "required": [
+      "email",
+      "password"
+    ],
     "properties": {
       "name": {
         "title": "Name",
@@ -16,15 +19,17 @@
       "email": {
         "title": "Eight Sleep Email",
         "type": "string",
-        "format": "email",
-        "required": true
+        "format": "email"
       },
       "password": {
         "title": "Eight Sleep Password",
         "type": "string",
-        "required": true,
-        "options": { "hidden": false },
-        "x-schema-form": { "type": "password" }
+        "options": {
+          "hidden": false
+        },
+        "x-schema-form": {
+          "type": "password"
+        }
       },
       "pollInterval": {
         "title": "Poll Interval (seconds)",
@@ -58,8 +63,34 @@
     }
   },
   "layout": [
-    { "type": "fieldset", "title": "Account", "items": ["email", "password"] },
-    { "type": "fieldset", "title": "Accessories", "expandable": true, "expanded": true, "items": ["awaySwitch", "leftName", "rightName"] },
-    { "type": "fieldset", "title": "Advanced", "expandable": true, "expanded": false, "items": ["pollInterval", "debug"] }
+    {
+      "type": "fieldset",
+      "title": "Account",
+      "items": [
+        "email",
+        "password"
+      ]
+    },
+    {
+      "type": "fieldset",
+      "title": "Accessories",
+      "expandable": true,
+      "expanded": true,
+      "items": [
+        "awaySwitch",
+        "leftName",
+        "rightName"
+      ]
+    },
+    {
+      "type": "fieldset",
+      "title": "Advanced",
+      "expandable": true,
+      "expanded": false,
+      "items": [
+        "pollInterval",
+        "debug"
+      ]
+    }
   ]
 }
