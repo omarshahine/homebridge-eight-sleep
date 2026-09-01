@@ -1,0 +1,65 @@
+{
+  "pluginAlias": "EightSleep",
+  "pluginType": "platform",
+  "singular": true,
+  "headerDisplay": "Each bed side appears as a Heater/Cooler. Sides and names are discovered from your Eight Sleep account.",
+  "schema": {
+    "type": "object",
+    "required": ["email", "password"],
+    "properties": {
+      "name": {
+        "title": "Name",
+        "type": "string",
+        "default": "Eight Sleep",
+        "description": "Plugin name as displayed in the Homebridge log."
+      },
+      "email": {
+        "title": "Eight Sleep Email",
+        "type": "string",
+        "format": "email",
+        "required": true
+      },
+      "password": {
+        "title": "Eight Sleep Password",
+        "type": "string",
+        "required": true,
+        "options": { "hidden": false },
+        "x-schema-form": { "type": "password" }
+      },
+      "pollInterval": {
+        "title": "Poll Interval (seconds)",
+        "type": "integer",
+        "default": 60,
+        "minimum": 30,
+        "description": "How often to read the Pod's state. Minimum 30 seconds; Eight Sleep rate-limits aggressive polling."
+      },
+      "awaySwitch": {
+        "title": "Expose Away Mode Switches",
+        "type": "boolean",
+        "default": true,
+        "description": "Adds one away-mode switch per bed side (e.g. 'Omar Away'). Eight Sleep tracks away mode per person."
+      },
+      "leftName": {
+        "title": "Left Side Name",
+        "type": "string",
+        "placeholder": "Auto (e.g. Omar's Side)"
+      },
+      "rightName": {
+        "title": "Right Side Name",
+        "type": "string",
+        "placeholder": "Auto"
+      },
+      "debug": {
+        "title": "Debug Logging",
+        "type": "boolean",
+        "default": false,
+        "description": "Log every poll result. Otherwise only changes and errors are logged."
+      }
+    }
+  },
+  "layout": [
+    { "type": "fieldset", "title": "Account", "items": ["email", "password"] },
+    { "type": "fieldset", "title": "Accessories", "expandable": true, "expanded": true, "items": ["awaySwitch", "leftName", "rightName"] },
+    { "type": "fieldset", "title": "Advanced", "expandable": true, "expanded": false, "items": ["pollInterval", "debug"] }
+  ]
+}
